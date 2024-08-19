@@ -9,3 +9,7 @@ wheels/
 # venv
 .venv
 .env
+
+# db
+*.db
+*.duckdb

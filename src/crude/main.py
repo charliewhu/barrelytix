@@ -1,39 +1,138 @@
 import os
-import httpx
+from dotenv import load_dotenv
 import dlt
 
-API_KEY = os.environ.get("API_KEY")
-API_URL = f"https://api.eia.gov/v2/crude-oil-imports/data/?api_key={API_KEY}"
-API_EXAMPLE_PARAMS = "frequency=monthly&data[0]=quantity&start=2023-01&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=5000"
-DB_PATH = "db.duckdb"
-
-
-# Create a dlt pipeline that will load
-# chess player data to the DuckDB destination
-pipeline = dlt.pipeline(
-    pipeline_name="chess_pipeline", destination="duckdb", dataset_name="player_data"
+from rest_api import (
+    rest_api_source,
 )
 
 
-def get_data_from_chess_api():
-    # Grab some player data from Chess.com API
-    data = []
-    for player in ["magnuscarlsen", "rpragchess"]:
-        response = httpx.get(f"https://api.chess.com/pub/player/{player}")
-        response.raise_for_status()
-        data.append(response.json())
+load_dotenv(override=True)
 
-    return data
+
+eia_source = rest_api_source(
+    {
+        "client": {
+            "base_url": "https://api.eia.gov/v2/",
+            "headers": {},
+        },
+        "resource_defaults": {
+            "endpoint": {
+                "params": {
+                    "api_key": os.getenv("API_KEY"),
+                    "offset": "0",
+                    # "length": "10000",
+                    "frequency": "monthly",
+                    "start": "2000-01",
+                    # "sort": [
+                    #     {
+                    #         "column": "period",
+                    #         "direction": "desc",
+                    #     }
+                    # ],
+                },
+            },
+        },
+        "resources": [
+            {
+                "name": "imports",
+                "endpoint": {
+                    "path": "crude-oil-imports/data",
+                    "params": {},
+                },
+            },
+            {
+                "name": "prices",
+                "endpoint": {
+                    "path": "petroleum/pri/spt/data/",
+                    "params": {
+                        "facets[product][]": "EPCWTI",  # only WTI prices
+                    },
+                },
+            },
+            {
+                "name": "production",
+                "endpoint": {
+                    "path": "petroleum/crd/crpdn/data",
+                    "params": {},
+                },
+            },
+            {
+                "name": "net_imports",
+                "endpoint": {
+                    "path": "petroleum/move/neti/data",
+                    "params": {
+                        "facets[product][]": "EPC0",  # only crude oil
+                    },
+                },
+            },
+            {
+                "name": "stocks",
+                "endpoint": {
+                    "path": "petroleum/stoc/wstk/data",
+                    "params": {
+                        "frequency": "weekly",
+                        "facets[product][]": "EPC0",  # only crude oil
+                        "facets[series][]": "WCRSTUS1",  # entire US
+                    },
+                },
+            },
+            {
+                "name": "refinery_stocks",
+                "endpoint": {
+                    "path": "petroleum/stoc/ref/data",
+                    "params": {
+                        "facets[product][]": "EPC0",  # only crude oil
+                    },
+                },
+            },
+            {
+                "name": "refinery_net_input",
+                "endpoint": {
+                    "path": "petroleum/pnp/wiup/data",
+                    "params": {
+                        "frequency": "weekly",
+                        "facets[product][]": "EPC0",  # only crude oil
+                    },
+                },
+            },
+            {
+                "name": "supply_estimates",
+                "endpoint": {
+                    "path": "petroleum/sum/sndw/data",
+                    "params": {
+                        "frequency": "weekly",
+                        "facets[product][]": "EPC0",  # only crude oil
+                        "facets[process][]": "FPF",  # field production
+                    },
+                },
+            },
+            {
+                "name": "international_production",
+                "endpoint": {
+                    "path": "international/data",
+                    "params": {
+                        "facets[productId][]": "57",  # only crude oil
+                        "facets[activityId][1]": "1",  # production
+                        "facets[activityId][2]": "2",  # or consumption
+                    },
+                },
+            },
+        ],
+    }
+)
 
 
 def main():
-    if not os.path.exists(DB_PATH):
-        print("hi")
+    pipeline = dlt.pipeline(
+        pipeline_name="black",  # database name
+        dataset_name="eia",  # schema name
+        destination="duckdb",
+        progress="log",
+    )
 
-    data = get_data_from_chess_api()
-
-    # Extract, normalize, and load the data
-    load_info = pipeline.run(data, table_name="player")
+    load_info = pipeline.run(eia_source)
+    print(load_info)
 
 
 if __name__ == "__main__":
