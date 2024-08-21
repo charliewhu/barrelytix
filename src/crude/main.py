@@ -1,5 +1,3 @@
-import os
-from dotenv import load_dotenv
 import dlt
 
 from .sources import eia
