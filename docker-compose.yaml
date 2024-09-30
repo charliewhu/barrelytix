@@ -1,0 +1,29 @@
+services:
+  ui:
+    build: .
+    expose:
+      - 8501
+    volumes:
+      - ./src/:/app/src/
+      - /app/.venv
+    command: streamlit run src/app.py
+    networks:
+      - web
+
+  nginx:
+    build: ./nginx
+    expose:
+      - 80
+    ports:
+      - 80:80
+    depends_on:
+      - ui
+    environment:
+      - VIRTUAL_HOST=barrelytix.charlieavery.site
+      - LETSENCRYPT_HOST=barrelytix.charlieavery.site
+    networks:
+      - web
+
+networks:
+  web:
+    external: true
