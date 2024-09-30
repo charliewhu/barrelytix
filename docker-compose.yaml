@@ -6,7 +6,7 @@ services:
     volumes:
       - ./src/:/app/src/
       - /app/.venv
-    command: streamlit run src/app.py
+    command: streamlit run src/app.py --server.port 8080
     networks:
       - web
 
